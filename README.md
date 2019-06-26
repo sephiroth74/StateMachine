@@ -1,5 +1,7 @@
 # StateMachine
 
+>   Modification of the Tinder StateMachine: https://github.com/Tinder/StateMachine
+
 [![CircleCI](https://circleci.com/gh/Tinder/StateMachine.svg?style=svg)](https://circleci.com/gh/Tinder/StateMachine)
 
 A Kotlin DSL for finite state machine.
@@ -27,44 +29,36 @@ sealed class Event {
     object OnCondensed : Event()
 }
 
-sealed class SideEffect {
-    object LogMelted : SideEffect()
-    object LogFrozen : SideEffect()
-    object LogVaporized : SideEffect()
-    object LogCondensed : SideEffect()
-}
 ~~~
 
 Declare state transitions:
 ~~~kotlin
-val stateMachine = StateMachine.create<State, Event, SideEffect> {
+val stateMachine = StateMachine.create<State, Event> {
     initialState(State.Solid)
     state<State.Solid> {
         on<Event.OnMelted> {
-            transitionTo(State.Liquid, SideEffect.LogMelted)
+            transitionTo(State.Liquid)
         }
     }
     state<State.Liquid> {
         on<Event.OnFroze> {
-            transitionTo(State.Solid, SideEffect.LogFrozen)
+            transitionTo(State.Solid)
         }
         on<Event.OnVaporized> {
-            transitionTo(State.Gas, SideEffect.LogVaporized)
+            transitionTo(State.Gas)
         }
     }
     state<State.Gas> {
         on<Event.OnCondensed> {
-            transitionTo(State.Liquid, SideEffect.LogCondensed)
+            transitionTo(State.Liquid)
         }
     }
     onTransition {
         val validTransition = it as? StateMachine.Transition.Valid ?: return@onTransition
-        when (validTransition.sideEffect) {
-            SideEffect.LogMelted -> logger.log(ON_MELTED_MESSAGE)
-            SideEffect.LogFrozen -> logger.log(ON_FROZEN_MESSAGE)
-            SideEffect.LogVaporized -> logger.log(ON_VAPORIZED_MESSAGE)
-            SideEffect.LogCondensed -> logger.log(ON_CONDENSED_MESSAGE)
-        }
+    }
+
+    onFinish {
+        // state machine reached the final state
     }
 }
 ~~~
@@ -79,9 +73,8 @@ val transition = stateMachine.transition(OnMelted)
 // Then
 assertThat(stateMachine.state).isEqualTo(Liquid)
 assertThat(transition).isEqualTo(
-    StateMachine.Transition.Valid(Solid, OnMelted, Liquid, LogMelted)
+    StateMachine.Transition.Valid(Solid, OnMelted, Liquid)
 )
-then(logger).should().log(ON_MELTED_MESSAGE)
 ~~~
 
 ### Visualization
