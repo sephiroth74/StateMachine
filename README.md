@@ -1,6 +1,6 @@
-# StateMachine
-
 >   Modification of the Tinder StateMachine: https://github.com/Tinder/StateMachine
+
+# StateMachine
 
 [![CircleCI](https://circleci.com/gh/Tinder/StateMachine.svg?style=svg)](https://circleci.com/gh/Tinder/StateMachine)
 
@@ -35,11 +35,14 @@ Declare state transitions:
 ~~~kotlin
 val stateMachine = StateMachine.create<State, Event> {
     initialState(State.Solid)
+    finalState(State.Gas)
+    
     state<State.Solid> {
         on<Event.OnMelted> {
             transitionTo(State.Liquid)
         }
     }
+
     state<State.Liquid> {
         on<Event.OnFroze> {
             transitionTo(State.Solid)
@@ -49,10 +52,11 @@ val stateMachine = StateMachine.create<State, Event> {
         }
     }
     state<State.Gas> {
-        on<Event.OnCondensed> {
-            transitionTo(State.Liquid)
+        onEnter { oldState, event ->
+            // final state
         }
     }
+    
     onTransition {
         val validTransition = it as? StateMachine.Transition.Valid ?: return@onTransition
     }

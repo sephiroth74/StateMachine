@@ -1,4 +1,4 @@
-package com.sephiroth.android.library
+package it.sephiroth.android.library
 
 import java.util.concurrent.atomic.AtomicReference
 
