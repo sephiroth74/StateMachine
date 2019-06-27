@@ -2,10 +2,11 @@ buildscript {
     ext.kotlin_version = '1.3.40'
 
     repositories {
-        mavenCentral()
+        google()
         jcenter()
     }
     dependencies {
+        classpath 'com.android.tools.build:gradle:3.4.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath 'com.vanniktech:gradle-maven-publish-plugin:0.8.0'
     }
@@ -14,11 +15,33 @@ buildscript {
 group GROUP
 version VERSION_NAME
 
-apply plugin: 'com.vanniktech.maven.publish'
-apply plugin: 'kotlin'
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-kapt'
 
 repositories {
-    mavenCentral()
+    google()
+    jcenter()
+}
+
+
+
+android {
+
+    compileSdkVersion 28
+
+    defaultConfig {
+        minSdkVersion 14
+        targetSdkVersion 28
+        versionCode 1
+        versionName VERSION_NAME
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
@@ -30,3 +53,4 @@ dependencies {
     testImplementation 'org.assertj:assertj-core:3.11.1'
 }
 
+apply from: 'https://raw.githubusercontent.com/sephiroth74/gradle-mvn-push/master/gradle-mvn-push.gradle'

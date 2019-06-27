@@ -12,6 +12,9 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
     val state: STATE
         get() = stateRef.get()
 
+    /**
+     * Reset the [StateMachine] to its initial state
+     */
     fun reset() {
         synchronized(this) {
             stateRef.set(graph.initialState)

@@ -101,7 +101,7 @@ Snapshots of the development version are available in [Sonatype's `snapshots` re
 
 ##### Gradle:
 ```groovy
-implementation 'com.tinder.statemachine:statemachine:0.2.0'
+implementation 'it.sephiroth.android.library:statemachine:0.0.2'
 ```
 
 ### License
