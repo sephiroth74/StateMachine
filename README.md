@@ -93,15 +93,15 @@ Snapshots of the development version are available in [Sonatype's `snapshots` re
 ##### Maven:
 ```xml
 <dependency>
-    <groupId>com.tinder.statemachine</groupId>
+    <groupId>it.sephiroth.android.library</groupId>
     <artifactId>statemachine</artifactId>
-    <version>0.2.0</version>
+    <version>1.0.0s</version>
 </dependency>
 ```
 
 ##### Gradle:
 ```groovy
-implementation 'it.sephiroth.android.library:statemachine:0.0.2'
+implementation 'it.sephiroth.android.library:statemachine:1.0.0s'
 ```
 
 ### License
