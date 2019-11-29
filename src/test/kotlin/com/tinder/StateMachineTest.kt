@@ -18,7 +18,7 @@ internal class StateMachineTest {
         private val logger = mock<Logger>()
         private val stateMachine = StateMachine.create<State, Event> {
             initialState(State.Solid)
-            finalState(State.Gas)
+            finalStates(arrayOf(State.Gas))
             state<State.Solid> {
                 on<Event.OnMelted> {
                     transitionTo(State.Liquid)
