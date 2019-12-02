@@ -1,8 +1,8 @@
-package com.tinder
+package it.sephiroth.android.library.statemachine
 
 import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.then
-import it.sephiroth.android.library.StateMachine
+import it.sephiroth.android.library.statemachine.StateMachine
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.assertj.core.api.Assertions.assertThatIllegalStateException
@@ -15,6 +15,7 @@ internal class StateMachineTest {
 
     class MatterStateMachine {
 
+        private var resetCount = 0
         private val logger = mock<Logger>()
         private val stateMachine = StateMachine.create<State, Event> {
             initialState(State.Solid)
@@ -49,6 +50,35 @@ internal class StateMachineTest {
             onFinish {
                 logger.log(ON_FINISH_MESSAGE)
             }
+
+            onReset {
+                logger.log(ON_RESET_MESSAGE)
+                resetCount += 1
+            }
+        }
+
+        @Test
+        fun test() {
+            assertThat(stateMachine.state).isEqualTo(State.Solid)
+            stateMachine.transition(Event.OnMelted)
+            assertThat(stateMachine.state).isEqualTo(State.Liquid)
+
+            stateMachine.reset()
+            assertThat(stateMachine.state).isEqualTo(State.Solid)
+            assertThat(resetCount).isEqualTo(1)
+
+            stateMachine.reset()
+            assertThat(stateMachine.state).isEqualTo(State.Solid)
+            assertThat(resetCount).isEqualTo(1)
+
+            stateMachine.transition(Event.OnMelted)
+            assertThat(stateMachine.state).isEqualTo(State.Liquid)
+
+            stateMachine.reset()
+            assertThat(stateMachine.state).isEqualTo(State.Solid)
+            assertThat(resetCount).isEqualTo(2)
+
+            assertThat(stateMachine.inState(State.Solid)).isEqualTo(true)
         }
 
         @Test
@@ -127,6 +157,7 @@ internal class StateMachineTest {
             const val ON_GAS_MESSAGE = "I'm gas"
             const val ON_SOLID_MESSAGE = "I'm solid"
             const val ON_FINISH_MESSAGE = "I'm finished"
+            const val ON_RESET_MESSAGE = "I've been reset"
 
             sealed class State {
                 object Solid : State()

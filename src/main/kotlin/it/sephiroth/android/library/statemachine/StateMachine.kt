@@ -1,13 +1,15 @@
-package it.sephiroth.android.library
+package it.sephiroth.android.library.statemachine
 
 import java.util.concurrent.atomic.AtomicReference
 
-class StateMachine<STATE : Any, EVENT : Any> private constructor(
-        private val graph: Graph<STATE, EVENT>
-) {
+class StateMachine<STATE : Any, EVENT : Any> private constructor(private val graph: Graph<STATE, EVENT>) {
 
     private val stateRef = AtomicReference(graph.initialState)
     private var finished = false
+
+    fun inState(vararg states: STATE): Boolean {
+        return state in states
+    }
 
     val state: STATE
         get() = stateRef.get()
@@ -17,8 +19,12 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
      */
     fun reset() {
         synchronized(this) {
-            stateRef.set(graph.initialState)
-            finished = false
+            val fromState = stateRef.get()
+            if (fromState != graph.initialState) {
+                stateRef.set(graph.initialState)
+                finished = false
+                notifyOnReset()
+            }
         }
     }
 
@@ -74,10 +80,11 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
     val STATE.isFinalState: Boolean
         get() = graph.finalStates?.let { this in it } ?: run { false }
 
-    private fun STATE.getDefinition() = graph.stateDefinitions
-            .filter { it.key.matches(this) }
-            .map { it.value }
-            .firstOrNull() ?: error("Missing definition for state ${this.javaClass.simpleName}!")
+    private fun STATE.getDefinition() =
+            graph.stateDefinitions
+                .filter { it.key.matches(this) }
+                .map { it.value }
+                .firstOrNull() ?: error("Missing definition for state ${this.javaClass.simpleName}!")
 
     private fun STATE.notifyOnEnter(cause: EVENT, fromState: STATE) {
         getDefinition().onEnterListeners.forEach { it(this, fromState, cause) }
@@ -95,6 +102,10 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
         graph.onFinishListeners.forEach { it(this@StateMachine) }
     }
 
+    private fun notifyOnReset() {
+        graph.onResetListeners.forEach { it(this@StateMachine) }
+    }
+
     @Suppress("UNUSED")
     sealed class Transition<out STATE : Any, out EVENT : Any> {
         abstract val fromState: STATE
@@ -104,12 +115,12 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
                 override val fromState: STATE,
                 override val event: EVENT,
                 val toState: STATE
-        ) : Transition<STATE, EVENT>()
+                                                                               ) : Transition<STATE, EVENT>()
 
         data class Invalid<out STATE : Any, out EVENT : Any> internal constructor(
                 override val fromState: STATE,
                 override val event: EVENT
-        ) : Transition<STATE, EVENT>()
+                                                                                 ) : Transition<STATE, EVENT>()
     }
 
     data class Graph<STATE : Any, EVENT : Any>(
@@ -117,8 +128,8 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
             val finalStates: Array<STATE>?,
             val stateDefinitions: Map<Matcher<STATE, STATE>, State<STATE, EVENT>>,
             val onTransitionListeners: List<(Transition<STATE, EVENT>) -> Unit>,
-            val onFinishListeners: List<(StateMachine<STATE, EVENT>) -> Unit>
-    ) {
+            val onFinishListeners: List<(StateMachine<STATE, EVENT>) -> Unit>,
+            val onResetListeners: List<(StateMachine<STATE, EVENT>) -> Unit>) {
 
         class State<STATE : Any, EVENT : Any> internal constructor() {
             val onEnterListeners = mutableListOf<(STATE, STATE, EVENT) -> Unit>()
@@ -128,9 +139,9 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
 
             val onFinishListeners = mutableListOf<(StateMachine<STATE, EVENT>) -> Unit>()
 
-            data class TransitionTo<out STATE : Any> internal constructor(
-                    val toState: STATE
-            )
+            val onResetListeners = mutableListOf<(StateMachine<STATE, EVENT>) -> Unit>()
+
+            data class TransitionTo<out STATE : Any> internal constructor(val toState: STATE)
         }
     }
 
@@ -159,12 +170,13 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
 
     class GraphBuilder<STATE : Any, EVENT : Any>(
             graph: Graph<STATE, EVENT>? = null
-    ) {
+                                                ) {
         private var initialState = graph?.initialState
         private var finalStates = graph?.finalStates
         private val stateDefinitions = LinkedHashMap(graph?.stateDefinitions ?: emptyMap())
         private val onTransitionListeners = ArrayList(graph?.onTransitionListeners ?: emptyList())
         private val onFinishListeners = ArrayList(graph?.onFinishListeners ?: emptyList())
+        private val onResetListeners = ArrayList(graph?.onResetListeners ?: emptyList())
 
         fun initialState(initialState: STATE) {
             this.initialState = initialState
@@ -177,7 +189,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
         fun <S : STATE> state(
                 stateMatcher: Matcher<STATE, S>,
                 init: StateDefinitionBuilder<S>.() -> Unit
-        ) {
+                             ) {
             stateDefinitions[stateMatcher] = StateDefinitionBuilder<S>().apply(init).build()
         }
 
@@ -188,7 +200,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
         inline fun <reified S : STATE> state(
                 state: S,
                 noinline init: StateDefinitionBuilder<S>.() -> Unit
-        ) {
+                                            ) {
             state(Matcher.eq<STATE, S>(state), init)
         }
 
@@ -200,14 +212,18 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
             onFinishListeners.add(listener)
         }
 
+        fun onReset(listener: (StateMachine<STATE, EVENT>) -> Unit) {
+            onResetListeners.add(listener)
+        }
+
         fun build(): Graph<STATE, EVENT> {
             return Graph(
                     requireNotNull(initialState),
                     finalStates,
                     stateDefinitions.toMap(),
                     onTransitionListeners.toList(),
-                    onFinishListeners.toList()
-            )
+                    onFinishListeners.toList(),
+                    onResetListeners.toList())
         }
 
         inner class StateDefinitionBuilder<S : STATE> {
@@ -221,7 +237,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
             fun <E : EVENT> on(
                     eventMatcher: Matcher<EVENT, E>,
                     createTransitionTo: S.(E) -> Graph.State.TransitionTo<STATE>?
-            ) {
+                              ) {
                 stateDefinition.transitions[eventMatcher] = { state, event ->
                     @Suppress("UNCHECKED_CAST")
                     createTransitionTo((state as S), event as E)
@@ -230,7 +246,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
 
             inline fun <reified E : EVENT> on(
                     noinline createTransitionTo: S.(E) -> Graph.State.TransitionTo<STATE>?
-            ) {
+                                             ) {
                 return on(any(), createTransitionTo)
             }
 
@@ -238,7 +254,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
             inline fun <reified E : EVENT> on(
                     event: E,
                     noinline createTransitionTo: S.(E) -> Graph.State.TransitionTo<STATE>?
-            ) {
+                                             ) {
                 return on(eq(event), createTransitionTo)
             }
 
@@ -269,15 +285,13 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(
 
     companion object {
         fun <STATE : Any, EVENT : Any> create(
-                init: GraphBuilder<STATE, EVENT>.() -> Unit
-        ): StateMachine<STATE, EVENT> {
+                init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
             return create(null, init)
         }
 
         private fun <STATE : Any, EVENT : Any> create(
                 graph: Graph<STATE, EVENT>?,
-                init: GraphBuilder<STATE, EVENT>.() -> Unit
-        ): StateMachine<STATE, EVENT> {
+                init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
             return StateMachine(GraphBuilder(graph).apply(init).build())
         }
     }
