@@ -13,6 +13,86 @@ import org.junit.runner.RunWith
 @RunWith(Enclosed::class)
 internal class StateMachineTest {
 
+    class SimpleStateMachine {
+
+        private val stateMachine = StateMachine.create<State, Event> {
+            initialState(State.State1)
+            finalStates(arrayOf(State.State4))
+
+            state<State.State1> {
+                on<Event.E2> { transitionTo(State.State2) }
+            }
+
+            state<State.State2> {
+                on<Event.E3> { transitionTo(State.State3) }
+                on<Event.E1> { transitionTo(State.State1) }
+            }
+
+            state<State.State3> {
+                on<Event.E2> { transitionTo(State.State2) }
+                on<Event.E4> { transitionTo(State.State4) }
+            }
+
+            state<State.State4> {
+                on<Event.E3> { transitionTo(State.State3) }
+            }
+
+            onTransition {
+                println("onTranstion($it)")
+            }
+            onFinish { println("onFinish()") }
+            onReset {
+                println("onReset")
+            }
+
+        }.also {
+            it.observeStateChanges().subscribe { states ->
+                println("transition ==> $states")
+            }
+        }
+
+        @Test
+        fun test001() {
+            stateMachine.transition(Event.E2)
+            stateMachine.transition(Event.E3)
+            stateMachine.transition(Event.E4)
+            stateMachine.transition(Event.E3)
+            stateMachine.transition(Event.E2)
+            stateMachine.transition(Event.E1)
+
+            stateMachine.reset()
+            stateMachine.transition(Event.E2)
+            stateMachine.transition(Event.E3)
+            stateMachine.transition(Event.E2)
+            stateMachine.transition(Event.E1)
+        }
+
+        companion object {
+            sealed class State {
+                object State1 : State()
+                object State2 : State()
+                object State3 : State()
+                object State4 : State()
+
+                override fun toString(): String {
+                    return javaClass.simpleName
+                }
+            }
+
+            sealed class Event {
+                object E1 : Event()
+                object E2 : Event()
+                object E3 : Event()
+                object E4 : Event()
+
+                override fun toString(): String {
+                    return javaClass.simpleName
+                }
+            }
+        }
+
+    }
+
     class MatterStateMachine {
 
         private var resetCount = 0
@@ -98,7 +178,7 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Liquid)
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(State.Solid, Event.OnMelted, State.Liquid)
+                    StateMachine.Transition.Valid(State.Solid, Event.OnMelted, State.Liquid)
             )
             then(logger).should().log(ON_LIQUID_MESSAGE)
         }
@@ -114,7 +194,7 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Solid)
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(State.Liquid, Event.OnFrozen, State.Solid)
+                    StateMachine.Transition.Valid(State.Liquid, Event.OnFrozen, State.Solid)
             )
             then(logger).should().log(ON_SOLID_MESSAGE)
         }
@@ -130,7 +210,7 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Gas)
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(State.Liquid, Event.OnVaporized, State.Gas)
+                    StateMachine.Transition.Valid(State.Liquid, Event.OnVaporized, State.Gas)
             )
             then(logger).should().log(ON_GAS_MESSAGE)
         }
@@ -163,6 +243,10 @@ internal class StateMachineTest {
                 object Solid : State()
                 object Liquid : State()
                 object Gas : State()
+
+                override fun toString(): String {
+                    return javaClass.simpleName.toString()
+                }
             }
 
             sealed class Event {
@@ -224,11 +308,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Locked(credit = 10))
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Locked(credit = 0),
-                    Event.InsertCoin(10),
-                    State.Locked(credit = 10)
-                )
+                    StateMachine.Transition.Valid(
+                            State.Locked(credit = 0),
+                            Event.InsertCoin(10),
+                            State.Locked(credit = 10)
+                    )
             )
         }
 
@@ -243,11 +327,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Unlocked)
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Locked(credit = 35),
-                    Event.InsertCoin(15),
-                    State.Unlocked
-                )
+                    StateMachine.Transition.Valid(
+                            State.Locked(credit = 35),
+                            Event.InsertCoin(15),
+                            State.Unlocked
+                    )
             )
         }
 
@@ -262,11 +346,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Unlocked)
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Locked(credit = 35),
-                    Event.InsertCoin(20),
-                    State.Unlocked
-                )
+                    StateMachine.Transition.Valid(
+                            State.Locked(credit = 35),
+                            Event.InsertCoin(20),
+                            State.Unlocked
+                    )
             )
         }
 
@@ -281,11 +365,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Locked(credit = 35))
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Locked(credit = 35),
-                    Event.AdmitPerson,
-                    State.Locked(credit = 35)
-                )
+                    StateMachine.Transition.Valid(
+                            State.Locked(credit = 35),
+                            Event.AdmitPerson,
+                            State.Locked(credit = 35)
+                    )
             )
         }
 
@@ -300,11 +384,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Broken(oldState = State.Locked(credit = 15)))
             assertThat(transitionToBroken).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Locked(credit = 15),
-                    Event.MachineDidFail,
-                    State.Broken(oldState = State.Locked(credit = 15))
-                )
+                    StateMachine.Transition.Valid(
+                            State.Locked(credit = 15),
+                            Event.MachineDidFail,
+                            State.Broken(oldState = State.Locked(credit = 15))
+                    )
             )
         }
 
@@ -319,11 +403,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Locked(credit = 0))
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Unlocked,
-                    Event.AdmitPerson,
-                    State.Locked(credit = 0)
-                )
+                    StateMachine.Transition.Valid(
+                            State.Unlocked,
+                            Event.AdmitPerson,
+                            State.Locked(credit = 0)
+                    )
             )
         }
 
@@ -338,11 +422,11 @@ internal class StateMachineTest {
             // Then
             assertThat(stateMachine.state).isEqualTo(State.Locked(credit = 15))
             assertThat(transition).isEqualTo(
-                StateMachine.Transition.Valid(
-                    State.Broken(oldState = State.Locked(credit = 15)),
-                    Event.MachineRepairDidComplete,
-                    State.Locked(credit = 15)
-                )
+                    StateMachine.Transition.Valid(
+                            State.Broken(oldState = State.Locked(credit = 15)),
+                            Event.MachineRepairDidComplete,
+                            State.Locked(credit = 15)
+                    )
             )
         }
 
@@ -426,7 +510,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transitionFromStateAToStateB).isEqualTo(
-                    StateMachine.Transition.Valid(State.A, Event.E1, State.B)
+                        StateMachine.Transition.Valid(State.A, Event.E1, State.B)
                 )
 
                 // When
@@ -434,7 +518,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transitionFromStateBToStateC).isEqualTo(
-                    StateMachine.Transition.Valid(State.B, Event.E3, State.C)
+                        StateMachine.Transition.Valid(State.B, Event.E3, State.C)
                 )
             }
 
@@ -460,7 +544,7 @@ internal class StateMachineTest {
 
                 // Then
                 then(onTransitionListener1).should().invoke(
-                    StateMachine.Transition.Valid(State.A, Event.E1, State.B)
+                        StateMachine.Transition.Valid(State.A, Event.E1, State.B)
                 )
 
                 // When
@@ -468,14 +552,14 @@ internal class StateMachineTest {
 
                 // Then
                 then(onTransitionListener2).should()
-                    .invoke(StateMachine.Transition.Valid(State.B, Event.E3, State.C))
+                        .invoke(StateMachine.Transition.Valid(State.B, Event.E3, State.C))
 
                 // When
                 stateMachine.transition(Event.E4)
 
                 // Then
                 then(onTransitionListener2).should()
-                    .invoke(StateMachine.Transition.Valid(State.C, Event.E4, State.C))
+                        .invoke(StateMachine.Transition.Valid(State.C, Event.E4, State.C))
             }
 
             @Test
@@ -506,7 +590,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transition).isEqualTo(
-                    StateMachine.Transition.Invalid<State, Event>(State.A, Event.E3)
+                        StateMachine.Transition.Invalid<State, Event>(State.A, Event.E3)
                 )
                 assertThat(stateMachine.state).isEqualTo(fromState)
             }
@@ -515,9 +599,9 @@ internal class StateMachineTest {
             fun transition_givenUndeclaredState_shouldThrowIllegalStateException() {
                 // Then
                 assertThatIllegalStateException()
-                    .isThrownBy {
-                        stateMachine.transition(Event.E4)
-                    }
+                        .isThrownBy {
+                            stateMachine.transition(Event.E4)
+                        }
             }
         }
 
@@ -534,6 +618,10 @@ internal class StateMachineTest {
 
         private companion object {
             private sealed class State {
+                override fun toString(): String {
+                    return javaClass.simpleName
+                }
+
                 object A : State()
                 object B : State()
                 object C : State()
@@ -610,7 +698,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transitionFromStateAToStateB).isEqualTo(
-                    StateMachine.Transition.Valid(STATE_A, EVENT_1, STATE_B)
+                        StateMachine.Transition.Valid(STATE_A, EVENT_1, STATE_B)
                 )
 
                 // When
@@ -618,7 +706,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transitionFromStateBToStateC).isEqualTo(
-                    StateMachine.Transition.Valid(STATE_B, EVENT_3, STATE_C)
+                        StateMachine.Transition.Valid(STATE_B, EVENT_3, STATE_C)
                 )
             }
 
@@ -644,7 +732,7 @@ internal class StateMachineTest {
 
                 // Then
                 then(onTransitionListener1).should().invoke(
-                    StateMachine.Transition.Valid(STATE_A, EVENT_1, STATE_B)
+                        StateMachine.Transition.Valid(STATE_A, EVENT_1, STATE_B)
                 )
 
                 // When
@@ -652,7 +740,7 @@ internal class StateMachineTest {
 
                 // Then
                 then(onTransitionListener2).should().invoke(
-                    StateMachine.Transition.Valid(STATE_B, EVENT_3, STATE_C)
+                        StateMachine.Transition.Valid(STATE_B, EVENT_3, STATE_C)
                 )
             }
 
@@ -684,7 +772,7 @@ internal class StateMachineTest {
 
                 // Then
                 assertThat(transition).isEqualTo(
-                    StateMachine.Transition.Invalid(STATE_A, EVENT_3)
+                        StateMachine.Transition.Invalid(STATE_A, EVENT_3)
                 )
                 assertThat(stateMachine.state).isEqualTo(fromState)
             }
@@ -693,9 +781,9 @@ internal class StateMachineTest {
             fun transition_givenUndeclaredState_shouldThrowIllegalStateException() {
                 // Then
                 assertThatIllegalStateException()
-                    .isThrownBy {
-                        stateMachine.transition(EVENT_4)
-                    }
+                        .isThrownBy {
+                            stateMachine.transition(EVENT_4)
+                        }
             }
         }
 
@@ -726,8 +814,8 @@ internal class StateMachineTest {
             fun transition_givenMissingDestinationStateDefinition_shouldThrowIllegalStateExceptionWithStateName() {
                 // Then
                 assertThatIllegalStateException()
-                    .isThrownBy { stateMachine.transition(EVENT_1) }
-                    .withMessage("Missing definition for state ${STATE_B.javaClass.simpleName}!")
+                        .isThrownBy { stateMachine.transition(EVENT_1) }
+                        .withMessage("Missing definition for state ${STATE_B.javaClass.simpleName}!")
             }
         }
 
