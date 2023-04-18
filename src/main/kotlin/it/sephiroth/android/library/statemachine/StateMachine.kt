@@ -11,7 +11,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val gra
 
     private val statePublisher = BehaviorSubject.createDefault(graph.initialState)
 
-    fun observeStateChanges(): Observable<MutableList<STATE>> = statePublisher.buffer(2, 1)
+    fun observeStateChanges(): Observable<MutableList<STATE>> = statePublisher.buffer(2, 1).share()
 
     fun inState(vararg states: STATE): Boolean {
         return state in states
