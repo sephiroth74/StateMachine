@@ -6,9 +6,8 @@ import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import java.util.concurrent.atomic.AtomicReference
 
-class StateMachine<STATE : Any, EVENT : Any> private constructor(private val looper: Looper,
+class StateMachine<STATE : Any, EVENT : Any> private constructor(private val handler: Handler,
                                                                  private val graph: Graph<STATE, EVENT>) {
-    private val handler: Handler = Handler(looper)
     private val stateRef = AtomicReference(graph.initialState)
     private var finished = false
     private val statePublisher = BehaviorSubject.createDefault(graph.initialState)
@@ -78,7 +77,7 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val loo
     }
 
     fun with(init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-        return create(looper, graph.copy(initialState = state), init)
+        return create(handler, graph.copy(initialState = state), init)
     }
 
     private fun STATE.getTransition(event: EVENT): Transition<STATE, EVENT> {
@@ -303,17 +302,18 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val loo
 
     companion object {
         fun <STATE : Any, EVENT : Any> create(init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-            return create(Looper.getMainLooper(), init)
+            return create(Handler(Looper.getMainLooper()), init)
         }
-        fun <STATE : Any, EVENT : Any> create(looper: Looper, init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-            return create(looper, null, init)
+
+        fun <STATE : Any, EVENT : Any> create(handler: Handler, init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
+            return create(handler, null, init)
         }
 
         private fun <STATE : Any, EVENT : Any> create(
-                looper: Looper,
+                handler: Handler,
                 graph: Graph<STATE, EVENT>?,
                 init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-            return StateMachine(looper, GraphBuilder(graph).apply(init).build())
+            return StateMachine(handler, GraphBuilder(graph).apply(init).build())
         }
     }
 }
