@@ -1,14 +1,16 @@
 package it.sephiroth.android.library.statemachine
 
+import android.os.Handler
+import android.os.Looper
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import java.util.concurrent.atomic.AtomicReference
 
-class StateMachine<STATE : Any, EVENT : Any> private constructor(private val graph: Graph<STATE, EVENT>) {
-
+class StateMachine<STATE : Any, EVENT : Any> private constructor(private val looper: Looper,
+                                                                 private val graph: Graph<STATE, EVENT>) {
+    private val handler: Handler = Handler(looper)
     private val stateRef = AtomicReference(graph.initialState)
     private var finished = false
-
     private val statePublisher = BehaviorSubject.createDefault(graph.initialState)
 
     fun observeStateChanges(): Observable<MutableList<STATE>> = statePublisher.buffer(2, 1).share()
@@ -24,6 +26,10 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val gra
      * Reset the [StateMachine] to its initial state
      */
     fun reset() {
+        handler.post { resetInternal() }
+    }
+
+    private fun resetInternal() {
         synchronized(this) {
             val fromState = stateRef.get()
             if (fromState != graph.initialState) {
@@ -34,13 +40,17 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val gra
         }
     }
 
-    fun transition(event: EVENT): Transition<STATE, EVENT>? {
+    fun transition(event: EVENT) {
+        handler.post { transitionInternal(event) }
+    }
+
+    private fun transitionInternal(event: EVENT) {
         val transition = synchronized(this) {
             if (finished) {
-                return null
+                return
             }
             val fromState = stateRef.get()
-            if (fromState.isFinalState) return null
+            if (fromState.isFinalState) return
 
             val transition = fromState.getTransition(event)
 
@@ -65,11 +75,10 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val gra
 
             if (transition.toState.isFinalState) notifyOnFinish()
         }
-        return transition
     }
 
     fun with(init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-        return create(graph.copy(initialState = state), init)
+        return create(looper, graph.copy(initialState = state), init)
     }
 
     private fun STATE.getTransition(event: EVENT): Transition<STATE, EVENT> {
@@ -293,15 +302,18 @@ class StateMachine<STATE : Any, EVENT : Any> private constructor(private val gra
     }
 
     companion object {
-        fun <STATE : Any, EVENT : Any> create(
-                init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-            return create(null, init)
+        fun <STATE : Any, EVENT : Any> create(init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
+            return create(Looper.getMainLooper(), init)
+        }
+        fun <STATE : Any, EVENT : Any> create(looper: Looper, init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
+            return create(looper, null, init)
         }
 
         private fun <STATE : Any, EVENT : Any> create(
+                looper: Looper,
                 graph: Graph<STATE, EVENT>?,
                 init: GraphBuilder<STATE, EVENT>.() -> Unit): StateMachine<STATE, EVENT> {
-            return StateMachine(GraphBuilder(graph).apply(init).build())
+            return StateMachine(looper, GraphBuilder(graph).apply(init).build())
         }
     }
 }

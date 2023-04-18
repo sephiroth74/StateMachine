@@ -1,8 +1,9 @@
 package it.sephiroth.android.library.statemachine
 
+import android.os.HandlerThread
+import android.os.Looper
 import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.then
-import it.sephiroth.android.library.statemachine.StateMachine
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.assertj.core.api.Assertions.assertThatIllegalStateException
@@ -12,10 +13,24 @@ import org.junit.runner.RunWith
 
 @RunWith(Enclosed::class)
 internal class StateMachineTest {
+    companion object {
+//        val handlerThread = HandlerThread(":state-machine").also { it.start() }
+
+        @JvmStatic
+        fun backgroundLooper(): Looper {
+            return Looper.getMainLooper()
+        }
+
+        @JvmStatic
+        fun foregroundLooper(): Looper {
+            return Looper.getMainLooper()
+        }
+
+    }
 
     class SimpleStateMachine {
 
-        private val stateMachine = StateMachine.create<State, Event> {
+        private val stateMachine = StateMachine.create<State, Event>(backgroundLooper()) {
             initialState(State.State1)
             finalStates(arrayOf(State.State4))
 
@@ -38,16 +53,16 @@ internal class StateMachineTest {
             }
 
             onTransition {
-                println("onTranstion($it)")
+                println("onTranstion($it) on thread ${Thread.currentThread()}")
             }
-            onFinish { println("onFinish()") }
+            onFinish { println("onFinish() on thread ${Thread.currentThread()}") }
             onReset {
-                println("onReset")
+                println("onReset() on thread ${Thread.currentThread()}")
             }
 
         }.also {
             it.observeStateChanges().subscribe { states ->
-                println("transition ==> $states")
+                println("transition ==> $states [on thread ${Thread.currentThread()}]")
             }
         }
 
@@ -97,7 +112,7 @@ internal class StateMachineTest {
 
         private var resetCount = 0
         private val logger = mock<Logger>()
-        private val stateMachine = StateMachine.create<State, Event> {
+        private val stateMachine = StateMachine.create<State, Event>(foregroundLooper()) {
             initialState(State.Solid)
             finalStates(arrayOf(State.Gas))
             state<State.Solid> {
@@ -264,7 +279,7 @@ internal class StateMachineTest {
 
     class TurnstileStateMachine {
 
-        private val stateMachine = StateMachine.create<State, Event> {
+        private val stateMachine = StateMachine.create<State, Event>(foregroundLooper()) {
             initialState(State.Locked(credit = 0))
             state<State.Locked> {
                 on<Event.InsertCoin> {
@@ -463,7 +478,7 @@ internal class StateMachineTest {
             private val onStateAExitListener2 = mock<State.(State, Event) -> Unit>()
             private val onStateCEnterListener1 = mock<State.(State, Event) -> Unit>()
             private val onStateCEnterListener2 = mock<State.(State, Event) -> Unit>()
-            private val stateMachine = StateMachine.create<State, Event> {
+            private val stateMachine = StateMachine.create<State, Event>(backgroundLooper()) {
                 initialState(State.A)
                 state<State.A> {
                     onExit(onStateAExitListener1)
@@ -611,7 +626,7 @@ internal class StateMachineTest {
             fun create_givenNoInitialState_shouldThrowIllegalArgumentException() {
                 // Then
                 assertThatIllegalArgumentException().isThrownBy {
-                    StateMachine.create<State, Event> {}
+                    StateMachine.create<State, Event>(foregroundLooper()) {}
                 }
             }
         }
@@ -654,7 +669,7 @@ internal class StateMachineTest {
             private val onStateCEnterListener2 = mock<String.(String, Int) -> Unit>()
             private val onStateAExitListener1 = mock<String.(String, Int) -> Unit>()
             private val onStateAExitListener2 = mock<String.(String, Int) -> Unit>()
-            private val stateMachine = StateMachine.create<String, Int> {
+            private val stateMachine = StateMachine.create<String, Int>(foregroundLooper()) {
                 initialState(STATE_A)
                 state(STATE_A) {
                     onExit(onStateAExitListener1)
@@ -793,14 +808,14 @@ internal class StateMachineTest {
             fun create_givenNoInitialState_shouldThrowIllegalArgumentException() {
                 // Then
                 assertThatIllegalArgumentException().isThrownBy {
-                    StateMachine.create<String, Int> {}
+                    StateMachine.create<String, Int>(foregroundLooper()) {}
                 }
             }
         }
 
         class WithMissingStateDefinition {
 
-            private val stateMachine = StateMachine.create<String, Int> {
+            private val stateMachine = StateMachine.create<String, Int>(foregroundLooper()) {
                 initialState(STATE_A)
                 state(STATE_A) {
                     on(EVENT_1) {
